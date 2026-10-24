@@ -20,6 +20,35 @@ def _terms(task: str) -> str:
     return " ".join(_tokens(task)[:4]) or task[:80]
 
 
+def _queries(task: str) -> list[str]:
+    tokens = _tokens(task)
+    queries = [task[:100], " ".join(tokens[:2]), " ".join(tokens[-2:])]
+    expansions = {
+        "image": ["image classification", "computer vision"],
+        "images": ["image classification", "computer vision"],
+        "vision": ["computer vision", "image classification"],
+        "defect": ["industrial defect detection", "anomaly detection"],
+        "defects": ["industrial defect detection", "anomaly detection"],
+        "sentiment": ["sentiment analysis", "text classification"],
+        "review": ["sentiment analysis", "product reviews"],
+        "reviews": ["sentiment analysis", "product reviews"],
+        "medical": ["medical diagnosis", "healthcare"],
+        "disease": ["medical diagnosis", "healthcare"],
+        "fraud": ["fraud detection", "anomaly detection"],
+        "forecasting": ["time series forecasting", "time series"],
+        "forecast": ["time series forecasting", "time series"],
+        "speech": ["speech recognition", "audio classification"],
+        "audio": ["audio classification", "speech recognition"],
+        "object": ["object detection", "computer vision"],
+        "housing": ["house prices", "regression"],
+        "price": ["house prices", "regression"],
+    }
+    for token in tokens:
+        queries.extend(expansions.get(token, []))
+    queries.extend(tokens[:4])
+    return list(dict.fromkeys(q for q in queries if q))[:8]
+
+
 def _normalise_hf(item: dict) -> dict:
     dataset_id = item.get("id") or item.get("modelId") or "unknown"
     tags = item.get("tags") or []
@@ -41,15 +70,9 @@ def _normalise_hf(item: dict) -> dict:
 
 def search_huggingface(task: str, limit: int = 8) -> list[dict]:
     """Search public Hugging Face datasets with broad fallback queries."""
-    tokens = _tokens(task)
-    queries = []
-    if len(tokens) >= 2:
-        queries.append(" ".join(tokens[:2]))
-    if tokens:
-        queries.extend(tokens[:3])
-    queries.append(task[:80])
+    queries = _queries(task)
     found = {}
-    for query in dict.fromkeys(queries):
+    for query in queries:
         try:
             response = requests.get(
                 HF_API,
