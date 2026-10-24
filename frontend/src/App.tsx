@@ -1,6 +1,6 @@
 import { useState } from 'react';
 type Dataset = {id:string;name:string;domain:string;rows:number;features:number;quality:number;diversity:number;redundancy:number;compute:string;description:string;score:number;score_breakdown:Record<string,number>};
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || '';
 const examples = ['Image classification for a small computer vision project','Predict housing prices using tabular data','Sentiment analysis on customer reviews'];
 export default function App() {
  const [task,setTask] = useState(examples[0]); const [size,setSize] = useState('any'); const [compute,setCompute] = useState('medium'); const [results,setResults] = useState<Dataset[]>([]); const [loading,setLoading] = useState(false); const [error,setError] = useState('');
