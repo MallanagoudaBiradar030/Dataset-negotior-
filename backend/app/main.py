@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from .catalog import DATASETS
 from .providers import search_huggingface, search_uci
 from .recommender import recommend
 
-app = FastAPI(title="AI Dataset Negotiator API", version="1.2.0")
+app = FastAPI(title="AI Dataset Negotiator API", version="1.3.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
 
@@ -27,52 +26,31 @@ def health():
     return {"status": "healthy"}
 
 
-@app.get("/api/datasets")
-def datasets():
-    return {"count": len(DATASETS), "datasets": DATASETS}
-
-
 @app.get("/api/sources")
 def sources():
     return {"sources": [
-        {"name": "Hugging Face", "status": "public API; live search at recommendation time", "auth_required": False},
-        {"name": "UCI Machine Learning Repository", "status": "public catalogue; live search at recommendation time", "auth_required": False},
-        {"name": "Kaggle", "status": "not connected; API token required", "auth_required": True},
+        {"name": "Hugging Face", "status": "live public dataset search", "auth_required": False},
+        {"name": "UCI Machine Learning Repository", "status": "live public catalogue search", "auth_required": False},
+        {"name": "Kaggle", "status": "not connected; API credentials required", "auth_required": True},
     ]}
 
 
 @app.post("/api/recommend")
 def get_recommendations(request: RecommendationRequest):
-    candidates = list(DATASETS)
-    provider_counts = {"Built-in catalogue": len(DATASETS), "Hugging Face": 0, "UCI": 0}
-    sources_used = ["Built-in catalogue"]
+    candidates = []
+    provider_counts = {"Hugging Face": 0, "UCI": 0}
+    errors = []
     if request.include_external:
-        hf_results = search_huggingface(request.task, limit=max(request.limit, 8))
-        uci_results = search_uci(request.task, limit=max(request.limit, 8))
+        hf_results = search_huggingface(request.task, limit=max(request.limit * 3, 12))
+        uci_results = search_uci(request.task, limit=max(request.limit * 2, 8))
         provider_counts["Hugging Face"] = len(hf_results)
         provider_counts["UCI"] = len(uci_results)
         candidates.extend(hf_results)
         candidates.extend(uci_results)
-        if hf_results:
-            sources_used.append("Hugging Face")
-        if uci_results:
-            sources_used.append("UCI")
-    unique = {}
-    for item in candidates:
-        unique[item["id"]] = item
-    # Rank the full pool first. Reserve slots for external providers so strong
-    # built-in scores cannot hide every live result from the user.
+    unique = {item["id"]: item for item in candidates}
     ranked = recommend(request.task, request.rows_preference, request.compute_budget, 20, list(unique.values()))
-    if request.include_external:
-        external = [item for item in ranked if item.get("source") in ("Hugging Face", "UCI")]
-        built_in = [item for item in ranked if item.get("source") not in ("Hugging Face", "UCI")]
-        external_slots = min(len(external), max(2, request.limit // 2))
-        selected = external[:external_slots] + built_in[:max(0, request.limit - external_slots)]
-        selected_ids = {item["id"] for item in selected}
-        selected.extend(item for item in ranked if item["id"] not in selected_ids and len(selected) < request.limit)
-        ranked = sorted(selected[:request.limit], key=lambda item: item["score"], reverse=True)
-    else:
-        ranked = ranked[:request.limit]
+    ranked = ranked[:request.limit]
+    sources_used = list(dict.fromkeys(item.get("source", "Unknown") for item in ranked))
     return {
         "task": request.task,
         "sources_used": sources_used,
@@ -81,4 +59,5 @@ def get_recommendations(request: RecommendationRequest):
         "candidate_count": len(unique),
         "weights": {"relevance": 35, "quality": 20, "diversity": 15, "low_redundancy": 10, "size_fit": 10, "compute_fit": 10},
         "recommendations": ranked,
+        "message": "No external datasets matched this query. Try a more specific task description." if not ranked else None,
     }
