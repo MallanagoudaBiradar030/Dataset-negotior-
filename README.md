@@ -7,7 +7,8 @@ A full-stack AIML college project that ranks datasets for a machine-learning tas
 - FastAPI REST API for dataset discovery and recommendations
 - React + TypeScript + Vite web interface
 - Explainable scoring: relevance (35%), data quality (20%), diversity (15%), low redundancy (10%), size fit (10%), compute fit (10%)
-- Demo catalog of classification, regression, image and text datasets
+- Built-in demo catalog plus live metadata search from Hugging Face and UCI
+- Explainable scoring across built-in and externally discovered datasets
 - Filters for dataset size and compute budget
 - Health endpoint for hosting checks
 
@@ -50,10 +51,14 @@ Open the URL printed by Vite.
 1. Import this repository in Vercel.
 2. Set the root directory to `frontend`.
 3. Build command: `npm run build`; output directory: `dist`.
-4. Add environment variable `VITE_API_URL` with the deployed Render URL (no trailing slash), then redeploy.
+4. If the frontend and backend are deployed separately, set `VITE_API_URL` to the deployed backend URL (no trailing slash), then redeploy.
 
-## Important scope note
-This MVP uses a curated demo catalog and heuristic scores. It does not yet crawl external dataset hubs or validate live dataset download links. Those are appropriate future extensions.
+## External dataset sources
+- Hugging Face public dataset metadata API: queried at recommendation time; public metadata search does not require a token.
+- UCI Machine Learning Repository public catalogue: queried at recommendation time where the public catalogue API responds in the expected format.
+- Kaggle is not connected yet because its API requires a user-generated token. Never commit API tokens to GitHub; configure them as host environment variables when adding this provider.
+
+External metadata may not include reliable row counts, feature counts, licences, or quality statistics. Missing values are treated as unknown/estimated for ranking, not as verified measurements. The app recommends dataset pages; it does not automatically download or audit dataset contents. If an external source is unavailable, the built-in catalogue still works.
 
 ## Testing
 From the backend folder, run `pytest`.
